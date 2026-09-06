@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Догонялки Диснея 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #000;
+            overflow: hidden;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+            z-index: 10;
+        }
+
+        .ui h2 {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .ui p {
+            margin: 5px 0;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px 30px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 100;
+            display: none;
+        }
+
+        .game-over h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .game-over p {
+            font-size: 24px;
+            margin: 10px 0;
+        }
+
+        .game-over button {
+            background: #FF6B9D;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        .game-over button:hover {
+            background: #FF1493;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="ui">
+        <h2>🏰 Догонялки 3D</h2>
+        <p>⭐ Звёзды: <span id="stars">0</span></p>
+        <p>❤️ Здоровье: <span id="health">❤️❤️❤️</span></p>
+    </div>
+
+    <div class="controls">
+        <p>⬅️ ➡️ ⬆️ ⬇️ или WASD - движение | SPACE - прыжок</p>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h1>ИГРА ОКОНЧЕНА!</h1>
+        <p>Собрано звёзд: <span id="finalScore">0</span></p>
+        <button onclick="location.reload()">🔄 Играть заново</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // === ИНИЦИАЛИЗАЦИЯ ===
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 200, 500);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 50;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // === ОСВЕЩЕНИЕ ===
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(100, 100, 50);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.far = 500;
+        directionalLight.shadow.camera.left = -200;
+        directionalLight.shadow.camera.right = 200;
+        directionalLight.shadow.camera.top = 200;
+        directionalLight.shadow.camera.bottom = -200;
+        scene.add(directionalLight);
+
+        // === ЗЕМЛЯ ===
+        const groundGeometry = new THREE.PlaneGeometry(400, 400);
+        const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x90EE90 });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // === SKY (облака) ===
+        const skyGeometry = new THREE.PlaneGeometry(500, 200);
+        const skyMaterial = new THREE.MeshBasicMaterial({ color: 0xE0F6FF });
+        const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+        sky.position.y = 120;
+        sky.position.z = -100;
+        scene.add(sky);
+
+        // Облака
+        for (let i = 0; i < 5; i++) {
+            const cloudGeometry = new THREE.SphereGeometry(15, 8, 8);
+            const cloudMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+            const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+            cloud.position.x = Math.random() * 300 - 150;
+            cloud.position.y = 80 + Math.random() * 40;
+            cloud.position.z = -80 - Math.random() * 50;
+            cloud.scale.set(2, 1, 1);
+            scene.add(cloud);
+        }
+
+        // === ЗАМОК ДИСНЕЯ ===
+        function createCastle() {
+            const castleGroup = new THREE.Group();
+
+            // Основание замка
+            const baseGeometry = new THREE.BoxGeometry(60, 40, 60);
+            const baseMaterial = new THREE.MeshPhongMaterial({ color: 0xD4A574 });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.set(120, 20, -100);
+            base.castShadow = true;
+            base.receiveShadow = true;
+            castleGroup.add(base);
+
+            // Главная башня
+            const towerGeometry = new THREE.CylinderGeometry(15, 15, 80, 16);
+            const towerMaterial = new THREE.MeshPhongMaterial({ color: 0xB8860B });
+            const tower = new THREE.Mesh(towerGeometry, towerMaterial);
+            tower.position.set(120, 40, -100);
+            tower.castShadow = true;
+            tower.receiveShadow = true;
+            castleGroup.add(tower);
+
+            // Крыша башни
+            const roofGeometry = new THREE.ConeGeometry(16, 30, 16);
+            const roofMaterial = new THREE.MeshPhongMaterial({ color: 0xFF1493 });
+            const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+            roof.position.set(120, 95, -100);
+            roof.castShadow = true;
+            roof.receiveShadow = true;
+            castleGroup.add(roof);
+
+            // Боковые башни
+            for (let i = -1; i <= 1; i += 2) {
+                const sideGeometry = new THREE.CylinderGeometry(8, 8, 60, 12);
+                const sideT = new THREE.Mesh(sideGeometry, towerMaterial);
+                sideT.position.set(120 + i * 50, 30, -100);
+                sideT.castShadow = true;
+                sideT.receiveShadow = true;
+                castleGroup.add(sideT);
+
+                const sideRoof = new THREE.Mesh(new THREE.ConeGeometry(9, 20, 12), roofMaterial);
+                sideRoof.position.set(120 + i * 50, 70, -100);
+                sideRoof.castShadow = true;
+                sideRoof.receiveShadow = true;
+                castleGroup.add(sideRoof);
+            }
+
+            scene.add(castleGroup);
+        }
+
+        createCastle();
+
+        // === ИГРОК (Микки) ===
+        const playerGroup = new THREE.Group();
+        const playerBody = new THREE.Mesh(
+            new THREE.SphereGeometry(8, 16, 16),
+            new THREE.MeshPhongMaterial({ color: 0xFF0000 })
+        );
+        playerBody.castShadow = true;
+        playerBody.receiveShadow = true;
+        playerGroup.add(playerBody);
+
+        // Ушки Микки
+        for (let i = -1; i <= 1; i += 2) {
+            const ear = new THREE.Mesh(
+                new THREE.SphereGeometry(5, 12, 12),
+                new THREE.MeshPhongMaterial({ color: 0xFF0000 })
+            );
+            ear.position.set(i * 8, 8, 0);
+            ear.scale.set(1, 1.2, 0.8);
+            ear.castShadow = true;
+            ear.receiveShadow = true;
+            playerGroup.add(ear);
+        }
+
+        playerGroup.position.set(0, 8, 0);
+        scene.add(playerGroup);
+
+        const player = {
+            group: playerGroup,
+            position: new THREE.Vector3(0, 8, 0),
+            velocity: new THREE.Vector3(0, 0, 0),
+            speed: 0.5,
+            health: 3,
+            isJumping: false,
+            jumpForce: 0.3
+        };
+
+        // === ВРАГ (Гумба) ===
+        const enemyGroup = new THREE.Group();
+        const enemyBody = new THREE.Mesh(
+            new THREE.SphereGeometry(8, 16, 16),
+            new THREE.MeshPhongMaterial({ color: 0x8B4513 })
+        );
+        enemyBody.castShadow = true;
+        enemyBody.receiveShadow = true;
+        enemyGroup.add(enemyBody);
+
+        // Глаза
+        for (let i = -1; i <= 1; i += 2) {
+            const eye = new THREE.Mesh(
+                new THREE.SphereGeometry(2, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+            );
+            eye.position.set(i * 4, 4, 8);
+            enemyGroup.add(eye);
+
+            const pupil = new THREE.Mesh(
+                new THREE.SphereGeometry(1, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0x000000 })
+            );
+            pupil.position.set(i * 4, 4, 8.5);
+            enemyGroup.add(pupil);
+        }
+
+        enemyGroup.position.set(100, 8, 100);
+        scene.add(enemyGroup);
+
+        const enemy = {
+            group: enemyGroup,
+            position: new THREE.Vector3(100, 8, 100),
+            speed: 0.25
+        };
+
+        // === ЗВЁЗДЫ ===
+        let stars = [];
+
+        function createStars() {
+            // Удаляем старые звёзды
+            stars.forEach(star => scene.remove(star.mesh));
+            stars = [];
+
+            for (let i = 0; i < 12; i++) {
+                const starMesh = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(5, 0),
+                    new THREE.MeshPhongMaterial({ color: 0xFFD700, emissive: 0xFFFF00 })
+                );
+                starMesh.castShadow = true;
+                starMesh.receiveShadow = true;
+                starMesh.position.set(
+                    Math.random() * 300 - 150,
+                    10,
+                    Math.random() * 300 - 150
+                );
+                scene.add(starMesh);
+
+                stars.push({
+                    mesh: starMesh,
+                    position: starMesh.position.clone(),
+                    rotation: 0
+                });
+            }
+        }
+
+        createStars();
+
+        // === УПРАВЛЕНИЕ ===
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // === ПЕРЕМЕННЫЕ ИГРЫ ===
+        let score = 0;
+        let gameOver = false;
+
+        // === ОСНОВНОЙ ЦИКЛ ===
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+
+            if (!gameOver) {
+                // Движение игрока
+                const moveDir = new THREE.Vector3(0, 0, 0);
+
+                if (keys['w'] || keys['arrowup']) moveDir.z -= 1;
+                if (keys['s'] || keys['arrowdown']) moveDir.z += 1;
+                if (keys['a'] || keys['arrowleft']) moveDir.x -= 1;
+                if (keys['d'] || keys['arrowright']) moveDir.x += 1;
+
+                if (moveDir.length() > 0) {
+                    moveDir.normalize();
+                    player.group.position.x += moveDir.x * player.speed;
+                    player.group.position.z += moveDir.z * player.speed;
+                }
+
+                // Прыжок
+                if ((keys[' '] || keys['space']) && !player.isJumping) {
+                    player.velocity.y = player.jumpForce;
+                    player.isJumping = true;
+                    keys[' '] = false;
+                    keys['space'] = false;
+                }
+
+                // Гравитация
+                player.velocity.y -= 0.01;
+                player.group.position.y += player.velocity.y;
+
+                if (player.group.position.y <= 8) {
+                    player.group.position.y = 8;
+                    player.velocity.y = 0;
+                    player.isJumping = false;
+                }
+
+                // Границы карты
+                const mapSize = 180;
+                player.group.position.x = Math.max(-mapSize, Math.min(mapSize, player.group.position.x));
+                player.group.position.z = Math.max(-mapSize, Math.min(mapSize, player.group.position.z));
+
+                // AI врага
+                const dx = player.group.position.x - enemy.group.position.x;
+                const dz = player.group.position.z - enemy.group.position.z;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+
+                if (distance > 0.1) {
+                    enemy.group.position.x += (dx / distance) * enemy.speed;
+                    enemy.group.position.z += (dz / distance) * enemy.speed;
+                }
+
+                // Границы врага
+                enemy.group.position.x = Math.max(-mapSize, Math.min(mapSize, enemy.group.position.x));
+                enemy.group.position.z = Math.max(-mapSize, Math.min(mapSize, enemy.group.position.z));
+
+                // Звёзды вращаются
+                stars.forEach(star => {
+                    star.rotation += 0.02;
+                    star.mesh.rotation.x = star.rotation;
+                    star.mesh.rotation.y = star.rotation;
+                });
+
+                // Проверка столкновения со звёздами
+                stars = stars.filter(star => {
+                    const dist = player.group.position.distanceTo(star.mesh.position);
+                    if (dist < 12) {
+                        scene.remove(star.mesh);
+                        score++;
+                        return false;
+                    }
+                    return true;
+                });
+
+                if (stars.length === 0) {
+                    createStars();
+                }
+
+                // Проверка столкновения с врагом
+                const enemyDist = player.group.position.distanceTo(enemy.group.position);
+                if (enemyDist < 16) {
+                    player.health--;
+                    player.group.position.set(0, 8, 0);
+                    enemy.group.position.set(100, 8, 100);
+
+                    if (player.health <= 0) {
+                        gameOver = true;
+                        document.getElementById('gameOverScreen').style.display = 'block';
+                        document.getElementById('finalScore').textContent = score;
+                    }
+                }
+
+                // Обновление камеры (следуй за игроком)
+                camera.position.x = player.group.position.x;
+                camera.position.y = player.group.position.y + 30;
+                camera.position.z = player.group.position.z + 40;
+                camera.lookAt(player.group.position.x, player.group.position.y, player.group.position.z);
+
+                // Обновление UI
+                document.getElementById('stars').textContent = score;
+                document.getElementById('health').textContent = '❤️'.repeat(Math.max(0, player.health));
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        gameLoop();
+
+        // Адаптивность
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
