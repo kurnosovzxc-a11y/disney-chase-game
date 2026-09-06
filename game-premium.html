@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Disney Adventure - Premium Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            overflow: hidden;
+            color: white;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* === ГЛАВНЫЙ UI === */
+        .hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .top-hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(50,50,100,0.6));
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #00D4FF;
+            box-shadow: 0 8px 32px rgba(0,212,255,0.3);
+            backdrop-filter: blur(10px);
+            min-width: 320px;
+        }
+
+        .game-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #FFD700;
+            margin-bottom: 15px;
+            text-shadow: 0 0 20px rgba(255,215,0,0.5);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 16px;
+            align-items: center;
+        }
+
+        .stat-label {
+            color: #00D4FF;
+            font-weight: bold;
+            min-width: 120px;
+        }
+
+        .stat-value {
+            color: #FFD700;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .health-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #FF0000;
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FF0000, #FF6B6B);
+            width: 100%;
+            transition: width 0.3s;
+            box-shadow: 0 0 10px rgba(255,0,0,0.5);
+        }
+
+        .enemy-tracker {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, rgba(139,0,0,0.8), rgba(0,0,0,0.8));
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #FF1493;
+            box-shadow: 0 8px 32px rgba(255,20,147,0.3);
+            backdrop-filter: blur(10px);
+            min-width: 300px;
+        }
+
+        .enemy-title {
+            font-size: 20px;
+            color: #FF1493;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255,20,147,0.5);
+        }
+
+        .enemy-item {
+            padding: 10px;
+            margin: 8px 0;
+            background: rgba(255,20,147,0.2);
+            border-left: 4px solid #FF1493;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .enemy-item:hover {
+            background: rgba(255,20,147,0.4);
+            transform: translateX(5px);
+        }
+
+        .enemy-item.caught {
+            background: rgba(50,205,50,0.3);
+            border-left-color: #32CD32;
+            text-decoration: line-through;
+            color: #90EE90;
+        }
+
+        .enemy-distance {
+            font-size: 12px;
+            color: #00D4FF;
+        }
+
+        .upgrades-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(50,100,50,0.6));
+            padding: 20px;
+            border-radius: 15px;
+            border: 2px solid #00FF00;
+            box-shadow: 0 8px 32px rgba(0,255,0,0.2);
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+        }
+
+        .upgrade-title {
+            color: #00FF00;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .upgrade-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: rgba(0,255,0,0.1);
+            border-radius: 5px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .upgrade-item.active {
+            background: rgba(0,255,0,0.3);
+            border-left: 3px solid #00FF00;
+        }
+
+        .minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,50,100,0.6));
+            border: 2px solid #00BFFF;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0,191,255,0.2);
+            overflow: hidden;
+        }
+
+        #minimap {
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls-info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 15px 30px;
+            border-radius: 15px;
+            border: 2px solid #00D4FF;
+            text-align: center;
+            font-size: 14px;
+            box-shadow: 0 8px 32px rgba(0,212,255,0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .crosshair svg {
+            width: 100%;
+            height: 100%;
+            stroke: #00FF00;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(100,0,200,0.8));
+            color: #FFD700;
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #FFD700;
+            text-align: center;
+            z-index: 200;
+            display: none;
+            pointer-events: none;
+            box-shadow: 0 0 50px rgba(255,215,0,0.5);
+            animation: popupShow 0.5s ease-out;
+        }
+
+        @keyframes popupShow {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .notification h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .menu-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0e27, #1a1a3e);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            pointer-events: auto;
+        }
+
+        .menu-content {
+            text-align: center;
+        }
+
+        .menu-title {
+            font-size: 72px;
+            color: #FFD700;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px rgba(255,215,0,0.5);
+            font-weight: bold;
+        }
+
+        .menu-subtitle {
+            font-size: 24px;
+            color: #00D4FF;
+            margin-bottom: 40px;
+        }
+
+        .menu-button {
+            padding: 20px 50px;
+            margin: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #FF1493, #FF6B9D);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 8px 32px rgba(255,20,147,0.3);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .menu-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 48px rgba(255,20,147,0.5);
+        }
+
+        .game-over-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(100,0,0,0.9));
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+            pointer-events: auto;
+        }
+
+        .game-over-content {
+            text-align: center;
+        }
+
+        .game-over-content h1 {
+            font-size: 72px;
+            color: #FFD700;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px rgba(255,215,0,0.5);
+        }
+
+        .game-over-content p {
+            font-size: 28px;
+            color: #00D4FF;
+            margin: 15px 0;
+        }
+
+        .game-over-stats {
+            background: rgba(0,0,0,0.6);
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #FFD700;
+            margin: 30px 0;
+        }
+
+        .stat {
+            font-size: 20px;
+            color: #FFD700;
+            margin: 10px 0;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0e27, #1a1a3e);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            pointer-events: none;
+        }
+
+        .loading-title {
+            font-size: 48px;
+            color: #FFD700;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(255,215,0,0.5);
+        }
+
+        .loading-bar {
+            width: 300px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #00D4FF;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #00D4FF, #00FF00);
+            width: 0%;
+            transition: width 0.3s;
+            box-shadow: 0 0 10px rgba(0,212,255,0.5);
+        }
+
+        .loading-text {
+            color: #00D4FF;
+            margin-top: 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- LOADING SCREEN -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-title">🏰 Disney Adventure</div>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
+        </div>
+        <div class="loading-text" id="loadingText">Загрузка парка...</div>
+    </div>
+
+    <!-- MENU SCREEN -->
+    <div class="menu-screen" id="menuScreen">
+        <div class="menu-content">
+            <div class="menu-title">🏰 DISNEY ADVENTURE</div>
+            <div class="menu-subtitle">Premium Edition</div>
+            <button class="menu-button" onclick="startGame()">🎮 НАЧАТЬ ИГРУ</button>
+            <button class="menu-button" onclick="showControls()">📖 ИНСТРУКЦИЯ</button>
+        </div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div class="game-over-screen" id="gameOverScreen">
+        <div class="game-over-content">
+            <h1 id="gameOverTitle">🎉 ПОБЕДА!</h1>
+            <div class="game-over-stats">
+                <div class="stat">Врагов поймано: <span id="finalCaught">0</span>/3</div>
+                <div class="stat">Финальный счёт: <span id="finalScore">0</span></div>
+                <div class="stat">Время игры: <span id="finalTime">0:00</span></div>
+                <div class="stat">Лучший апгрейд: <span id="finalUpgrade">Без апгрейдов</span></div>
+            </div>
+            <button class="menu-button" onclick="location.reload()">🔄 ИГРАТЬ ЗАНОВО</button>
+        </div>
+    </div>
+
+    <!-- HUD -->
+    <div class="hud" id="hud">
+        <!-- TOP LEFT -->
+        <div class="top-hud">
+            <div class="game-title">🏰 ОХОТА</div>
+            <div class="stat-row">
+                <span class="stat-label">Очки:</span>
+                <span class="stat-value" id="scoreDisplay">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Поймано:</span>
+                <span class="stat-value" id="caughtDisplay">0</span><span style="color: #888;">/3</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Здоровье:</span>
+                <div class="health-bar">
+                    <div class="health-fill" id="healthBar" style="width: 100%;"></div>
+                </div>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Уровень:</span>
+                <span class="stat-value" id="levelDisplay">1</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Локация:</span>
+                <span class="stat-value" id="locationDisplay">Парк</span>
+            </div>
+        </div>
+
+        <!-- TOP RIGHT -->
+        <div class="enemy-tracker">
+            <div class="enemy-title">🎯 ВРАГИ</div>
+            <div id="enemyList"></div>
+        </div>
+
+        <!-- BOTTOM LEFT -->
+        <div class="upgrades-panel">
+            <div class="upgrade-title">⚡ АПГРЕЙДЫ</div>
+            <div id="upgradesList"></div>
+        </div>
+
+        <!-- BOTTOM CENTER -->
+        <div class="controls-info">
+            <p>⬅️ WASD - Движение | 🖱️ Мышь - Камера | ПРОБЕЛ - Прыжок | E - Взаимодействие</p>
+        </div>
+
+        <!-- MINIMAP -->
+        <div class="minimap">
+            <canvas id="minimap" width="200" height="200"></canvas>
+        </div>
+    </div>
+
+    <!-- CROSSHAIR -->
+    <div class="crosshair">
+        <svg viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="8" fill="none" stroke="#00FF00" stroke-width="2"/>
+            <line x1="20" y1="0" x2="20" y2="10" stroke="#00FF00" stroke-width="2"/>
+            <line x1="20" y1="30" x2="20" y2="40" stroke="#00FF00" stroke-width="2"/>
+            <line x1="0" y1="20" x2="10" y2="20" stroke="#00FF00" stroke-width="2"/>
+            <line x1="30" y1="20" x2="40" y2="20" stroke="#00FF00" stroke-width="2"/>
+        </svg>
+    </div>
+
+    <!-- NOTIFICATION -->
+    <div class="notification" id="notification">
+        <h1 id="notificationText">✨ ВРАГ ПОЙМАН! ✨</h1>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        // ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
+        let gameStarted = false;
+        let gameOver = false;
+        let score = 0;
+        let caughtCount = 0;
+        let gameTime = 0;
+        let currentLevel = 1;
+        let currentLocation = 0;
+
+        // Апгрейды
+        const upgrades = {
+            speed: { level: 1, maxLevel: 5, label: "Скорость", cost: 50, current: 1 },
+            stamina: { level: 1, maxLevel: 5, label: "Выносливость", cost: 50, current: 1 },
+            vision: { level: 1, maxLevel: 3, label: "Зрение", cost: 100, current: 1 }
+        };
+
+        const locations = [
+            { name: "Парк", x: 0, z: 0, scale: 1 },
+            { name: "Замок", x: 300, z: -300, scale: 0.8 },
+            { name: "Лес", x: -300, z: 300, scale: 0.9 }
+        ];
+
+        function startGame() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('loadingScreen').style.display = 'flex';
+            gameStarted = true;
+            initScene();
+        }
+
+        function showControls() {
+            alert("⬅️ WASD - Движение\n🖱️ Мышь - Вращение камеры\nПРОБЕЛ - Прыжок\nE - Взаимодействие\n\nЦель: Поймайте всех 3 врагов!");
+        }
+
+        // ===== THREE.JS СЦЕНА =====
+        let scene, camera, renderer;
+        let player, enemies = [], particles = [];
+        let lights = [];
+
+        function initScene() {
+            const canvas = document.getElementById('canvas');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 800, 2000);
+
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                3000
+            );
+
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: canvas,
+                antialias: true,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.physicallyCorrectLights = true;
+
+            // ОСВЕЩЕНИЕ
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            directionalLight.position.set(300, 200, 200);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 4096;
+            directionalLight.shadow.mapSize.height = 4096;
+            directionalLight.shadow.camera.far = 2000;
+            directionalLight.shadow.camera.left = -1000;
+            directionalLight.shadow.camera.right = 1000;
+            directionalLight.shadow.camera.top = 1000;
+            directionalLight.shadow.camera.bottom = -1000;
+            directionalLight.shadow.bias = -0.0005;
+            scene.add(directionalLight);
+
+            // ОКРУЖЕНИЕ
+            createEnvironment();
+            createPlayer();
+            createEnemies();
+
+            // Скрыть экран загрузки
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('hud').style.display = 'block';
+                updateUI();
+                gameLoop();
+            }, 500);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function createEnvironment() {
+            // ОСНОВНАЯ ЗЕМЛЯ
+            const groundGeometry = new THREE.PlaneGeometry(2000, 2000);
+            const groundMaterial = new THREE.MeshStandardMaterial({
+                color: 0x90EE90,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // ТРАВА И ДЕТАЛИ
+            createGrassField();
+
+            // ЗАМОК
+            createMagicalCastle();
+
+            // ПАРК
+            createThemePark();
+
+            // ЛЕС
+            createForest();
+
+            // НЕБО
+            createSky();
+        }
+
+        function createGrassField() {
+            const grassGroup = new THREE.Group();
+            
+            for (let x = -600; x <= 600; x += 40) {
+                for (let z = -600; z <= 600; z += 40) {
+                    const grassTufts = Math.random() * 3 + 2;
+                    for (let i = 0; i < grassTufts; i++) {
+                        const grass = new THREE.Mesh(
+                            new THREE.ConeGeometry(2, 8 + Math.random() * 4, 4),
+                            new THREE.MeshStandardMaterial({
+                                color: new THREE.Color().setHSL(0.3, 0.6, 0.3 + Math.random() * 0.2),
+                                roughness: 0.9
+                            })
+                        );
+                        grass.position.set(
+                            x + Math.random() * 30,
+                            3 + Math.random() * 2,
+                            z + Math.random() * 30
+                        );
+                        grass.rotation.z = (Math.random() - 0.5) * 0.3;
+                        grass.scale.set(1 + Math.random() * 0.5, 1 + Math.random() * 0.5, 1);
+                        grass.castShadow = true;
+                        grassGroup.add(grass);
+                    }
+                }
+            }
+            scene.add(grassGroup);
+        }
+
+        function createMagicalCastle() {
+            const castleGroup = new THREE.Group();
+            castleGroup.position.set(0, 0, 0);
+
+            // ОСНОВАНИЕ
+            const baseGeometry = new THREE.BoxGeometry(300, 100, 300);
+            const baseMaterial = new THREE.MeshStandardMaterial({
+                color: 0xD4A574,
+                roughness: 0.6,
+                metalness: 0.2
+            });
+            const base = new THREE.Mesh(baseGeometry, baseMaterial);
+            base.position.y = 50;
+            base.castShadow = true;
+            base.receiveShadow = true;
+            castleGroup.add(base);
+
+            // ГЛАВНАЯ БАШНЯ
+            const towerGeometry = new THREE.CylinderGeometry(80, 80, 300, 32);
+            const tower = new THREE.Mesh(towerGeometry, baseMaterial);
+            tower.position.y = 150;
+            tower.castShadow = true;
+            tower.receiveShadow = true;
+            castleGroup.add(tower);
+
+            // КРЫША
+            const roofGeometry = new THREE.ConeGeometry(90, 120, 32);
+            const roofMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFF1493,
+                roughness: 0.5,
+                metalness: 0.3
+            });
+            const roof = new THREE.Mesh(roofGeometry, roofMaterial);
+            roof.position.y = 360;
+            roof.castShadow = true;
+            castleGroup.add(roof);
+
+            // БОКОВЫЕ БАШНИ
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 2) {
+                const x = Math.cos(angle) * 150;
+                const z = Math.sin(angle) * 150;
+
+                const sideGeometry = new THREE.CylinderGeometry(50, 50, 280, 24);
+                const side = new THREE.Mesh(sideGeometry, baseMaterial);
+                side.position.set(x, 140, z);
+                side.castShadow = true;
+                side.receiveShadow = true;
+                castleGroup.add(side);
+
+                const sideRoof = new THREE.Mesh(
+                    new THREE.ConeGeometry(60, 80, 24),
+                    roofMaterial
+                );
+                sideRoof.position.set(x, 320, z);
+                sideRoof.castShadow = true;
+                castleGroup.add(sideRoof);
+            }
+
+            // ФЛАГ
+            const flagPole = new THREE.Mesh(
+                new THREE.CylinderGeometry(5, 5, 100, 12),
+                new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+            );
+            flagPole.position.y = 440;
+            castleGroup.add(flagPole);
+
+            const flag = new THREE.Mesh(
+                new THREE.PlaneGeometry(60, 40),
+                new THREE.MeshStandardMaterial({ color: 0xFF6B9D })
+            );
+            flag.position.set(40, 440, 0);
+            castleGroup.add(flag);
+
+            scene.add(castleGroup);
+        }
+
+        function createThemePark() {
+            const parkGroup = new THREE.Group();
+
+            // КАРУСЕЛЬ
+            const carouselBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(100, 100, 20, 32),
+                new THREE.MeshStandardMaterial({ color: 0xFF1493 })
+            );
+            carouselBase.position.set(-300, 10, -300);
+            carouselBase.castShadow = true;
+            parkGroup.add(carouselBase);
+
+            const carouselPole = new THREE.Mesh(
+                new THREE.CylinderGeometry(15, 15, 150, 24),
+                new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+            );
+            carouselPole.position.set(-300, 75, -300);
+            carouselPole.castShadow = true;
+            parkGroup.add(carouselPole);
+
+            const carouselTop = new THREE.Mesh(
+                new THREE.CylinderGeometry(120, 100, 20, 32),
+                new THREE.MeshStandardMaterial({ color: 0xFFD700 })
+            );
+            carouselTop.position.set(-300, 150, -300);
+            carouselTop.castShadow = true;
+            parkGroup.add(carouselTop);
+
+            // КОЛЕСО ОБОЗРЕНИЯ
+            const wheelCenter = new THREE.Mesh(
+                new THREE.CylinderGeometry(20, 20, 40, 24),
+                new THREE.MeshStandardMaterial({ color: 0x696969 })
+            );
+            wheelCenter.position.set(300, 80, -300);
+            parkGroup.add(wheelCenter);
+
+            const wheelGroup = new THREE.Group();
+            wheelGroup.position.set(300, 100, -300);
+            
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const x = Math.cos(angle) * 100;
+                const y = Math.sin(angle) * 100;
+                
+                const cabin = new THREE.Mesh(
+                    new THREE.BoxGeometry(25, 25, 20),
+                    new THREE.MeshStandardMaterial({ color: 0x00BFFF })
+                );
+                cabin.position.set(x, y, 0);
+                cabin.castShadow = true;
+                wheelGroup.add(cabin);
+            }
+            parkGroup.add(wheelGroup);
+
+            // ФОНТАН
+            const fountainBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(80, 100, 15, 32),
+                new THREE.MeshStandardMaterial({ color: 0xB0C4DE })
+            );
+            fountainBase.position.set(300, 7.5, 300);
+            fountainBase.castShadow = true;
+            parkGroup.add(fountainBase);
+
+            const fountainColumn = new THREE.Mesh(
+                new THREE.CylinderGeometry(30, 30, 120, 24),
+                new THREE.MeshStandardMaterial({ color: 0x4169E1 })
+            );
+            fountainColumn.position.set(300, 65, 300);
+            fountainColumn.castShadow = true;
+            parkGroup.add(fountainColumn);
+
+            const fountainTop = new THREE.Mesh(
+                new THREE.SphereGeometry(50, 24, 24),
+                new THREE.MeshStandardMaterial({ color: 0x87CEEB })
+            );
+            fountainTop.position.set(300, 130, 300);
+            parkGroup.add(fountainTop);
+
+            scene.add(parkGroup);
+        }
+
+        function createForest() {
+            const forestGroup = new THREE.Group();
+
+            for (let x = -600; x <= 600; x += 150) {
+                for (let z = -600; z <= 600; z += 150) {
+                    if (Math.abs(x) > 200 || Math.abs(z) > 200) {
+                        // СТВОЛЫ ДЕРЕВЬЕВ
+                        const trunkHeight = 80 + Math.random() * 60;
+                        const trunk = new THREE.Mesh(
+                            new THREE.CylinderGeometry(15, 20, trunkHeight, 12),
+                            new THREE.MeshStandardMaterial({
+                                color: new THREE.Color().setHSL(0.08, 0.5, 0.3),
+                                roughness: 0.8
+                            })
+                        );
+                        trunk.position.set(x + (Math.random() - 0.5) * 80, trunkHeight / 2, z + (Math.random() - 0.5) * 80);
+                        trunk.castShadow = true;
+                        forestGroup.add(trunk);
+
+                        // ЛИСТВА
+                        const foliageGeometry = new THREE.SphereGeometry(60, 12, 12);
+                        const foliageMaterial = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color().setHSL(0.3, 0.7, 0.4),
+                            roughness: 0.7
+                        });
+                        const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+                        foliage.position.set(trunk.position.x, trunk.position.y + 100, trunk.position.z);
+                        foliage.castShadow = true;
+                        forestGroup.add(foliage);
+                    }
+                }
+            }
+
+            scene.add(forestGroup);
+        }
+
+        function createSky() {
+            // Облака
+            const cloudGroup = new THREE.Group();
+            for (let i = 0; i < 10; i++) {
+                const cloudGeometry = new THREE.SphereGeometry(40 + Math.random() * 30, 8, 8);
+                const cloudMaterial = new THREE.MeshBasicMaterial({ 
+                    color: new THREE.Color().setHSL(0, 0, 0.9 + Math.random() * 0.1)
+                });
+                const cloud = new THREE.Mesh(cloudGeometry, cloudMaterial);
+                cloud.position.set(
+                    Math.random() * 1000 - 500,
+                    300 + Math.random() * 200,
+                    Math.random() * 1000 - 500
+                );
+                cloud.scale.set(1.5 + Math.random() * 0.5, 1, 1 + Math.random() * 0.5);
+                cloudGroup.add(cloud);
+            }
+            scene.add(cloudGroup);
+        }
+
+        function createPlayer() {
+            const playerGroup = new THREE.Group();
+
+            // ТЕЛО
+            const bodyGeometry = new THREE.SphereGeometry(12, 24, 24);
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFF0000,
+                roughness: 0.6,
+                metalness: 0.2
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 12;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            playerGroup.add(body);
+
+            // ГОЛОВА
+            const headGeometry = new THREE.SphereGeometry(10, 24, 24);
+            const head = new THREE.Mesh(headGeometry, bodyMaterial);
+            head.position.y = 28;
+            head.castShadow = true;
+            head.receiveShadow = true;
+            playerGroup.add(head);
+
+            // УШКИ
+            for (let i of [-1, 1]) {
+                const earGeometry = new THREE.SphereGeometry(8, 16, 16);
+                const ear = new THREE.Mesh(earGeometry, bodyMaterial);
+                ear.position.set(i * 10, 36, 0);
+                ear.scale.set(0.8, 1.1, 0.7);
+                ear.castShadow = true;
+                playerGroup.add(ear);
+            }
+
+            // ГЛАЗА
+            for (let i of [-1, 1]) {
+                const eyeGeometry = new THREE.SphereGeometry(3, 12, 12);
+                const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+                const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                eye.position.set(i * 5, 31, 9);
+                playerGroup.add(eye);
+
+                const pupilGeometry = new THREE.SphereGeometry(1.5, 8, 8);
+                const pupilMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+                const pupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+                pupil.position.set(i * 5, 31, 9.5);
+                playerGroup.add(pupil);
+            }
+
+            // НОГИ
+            for (let i of [-1, 1]) {
+                const legGeometry = new THREE.CylinderGeometry(5, 5, 14, 12);
+                const legMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x333333,
+                    roughness: 0.8
+                });
+                const leg = new THREE.Mesh(legGeometry, legMaterial);
+                leg.position.set(i * 6, 3, 0);
+                leg.castShadow = true;
+                leg.receiveShadow = true;
+                playerGroup.add(leg);
+            }
+
+            playerGroup.position.set(0, 0, 0);
+            scene.add(playerGroup);
+
+            player = {
+                group: playerGroup,
+                position: new THREE.Vector3(0, 0, 0),
+                velocity: new THREE.Vector3(0, 0, 0),
+                speed: 0.8 * upgrades.speed.current,
+                maxHealth: 3,
+                health: 3,
+                isJumping: false,
+                jumpForce: 0.4,
+                direction: new THREE.Vector3(0, 0, -1),
+                rotation: 0,
+                score: 0
+            };
+        }
+
+        function createEnemies() {
+            const enemyConfigs = [
+                {
+                    name: "Гумба",
+                    color: 0x8B4513,
+                    position: new THREE.Vector3(150, 0, 150),
+                    speed: 0.3,
+                    icon: "👹"
+                },
+                {
+                    name: "Крюк",
+                    color: 0x800000,
+                    position: new THREE.Vector3(-150, 0, 150),
+                    speed: 0.25,
+                    icon: "⚓"
+                },
+                {
+                    name: "Малефисента",
+                    color: 0x4B0082,
+                    position: new THREE.Vector3(150, 0, -150),
+                    speed: 0.35,
+                    icon: "🦇"
+                }
+            ];
+
+            enemies = enemyConfigs.map(config => {
+                const group = new THREE.Group();
+
+                // ТЕЛО
+                const bodyGeometry = new THREE.SphereGeometry(11, 20, 20);
+                const bodyMaterial = new THREE.MeshStandardMaterial({
+                    color: config.color,
+                    roughness: 0.6,
+                    metalness: 0.1
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 11;
+                body.castShadow = true;
+                body.receiveShadow = true;
+                group.add(body);
+
+                // ГОЛОВА
+                const headGeometry = new THREE.SphereGeometry(9, 20, 20);
+                const head = new THREE.Mesh(headGeometry, bodyMaterial);
+                head.position.y = 26;
+                head.castShadow = true;
+                head.receiveShadow = true;
+                group.add(head);
+
+                // ГЛАЗА
+                for (let i of [-1, 1]) {
+                    const eyeGeometry = new THREE.SphereGeometry(2.5, 10, 10);
+                    const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+                    const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                    eye.position.set(i * 4, 29, 8);
+                    group.add(eye);
+
+                    const pupilGeometry = new THREE.SphereGeometry(1.2, 8, 8);
+                    const pupilMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
+                    const pupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+                    pupil.position.set(i * 4, 29, 8.5);
+                    group.add(pupil);
+                }
+
+                // НОГИ
+                for (let i of [-1, 1]) {
+                    const legGeometry = new THREE.CylinderGeometry(4, 4, 12, 10);
+                    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x222222 });
+                    const leg = new THREE.Mesh(legGeometry, legMaterial);
+                    leg.position.set(i * 5, 2, 0);
+                    leg.castShadow = true;
+                    leg.receiveShadow = true;
+                    group.add(leg);
+                }
+
+                group.position.copy(config.position);
+                scene.add(group);
+
+                return {
+                    name: config.name,
+                    group: group,
+                    position: config.position.clone(),
+                    speed: config.speed * (1 + upgrades.vision.current * 0.1),
+                    health: 1,
+                    caught: false,
+                    visionRange: 250 * upgrades.vision.current,
+                    icon: config.icon,
+                    wanderTimer: 0,
+                    wanderDir: 0
+                };
+            });
+        }
+
+        // ===== УПРАВЛЕНИЕ =====
+        const keys = {};
+        let mouseX = 0, mouseY = 0;
+        let cameraDistance = 60;
+        let cameraHeight = 35;
+        let cameraAngle = 0;
+
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+            mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+            cameraAngle = mouseX * Math.PI;
+        });
+
+        // ===== ОСНОВНОЙ ЦИКЛ =====
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+
+            if (!gameOver && gameStarted) {
+                gameTime += 1 / 60;
+
+                // ДВИЖЕНИЕ ИГРОКА
+                const moveDir = new THREE.Vector3(0, 0, 0);
+                if (keys['w'] || keys['arrowup']) moveDir.z -= 1;
+                if (keys['s'] || keys['arrowdown']) moveDir.z += 1;
+                if (keys['a'] || keys['arrowleft']) moveDir.x -= 1;
+                if (keys['d'] || keys['arrowright']) moveDir.x += 1;
+
+                if (moveDir.length() > 0) {
+                    moveDir.normalize();
+                    const targetRotation = Math.atan2(moveDir.x, moveDir.z);
+                    player.group.rotation.y = targetRotation;
+                    
+                    player.group.position.x += moveDir.x * player.speed;
+                    player.group.position.z += moveDir.z * player.speed;
+                }
+
+                // ПРЫЖОК
+                if ((keys[' '] || keys['spacebar']) && !player.isJumping) {
+                    player.velocity.y = player.jumpForce;
+                    player.isJumping = true;
+                    keys[' '] = false;
+                }
+
+                // ГРАВИТАЦИЯ
+                player.velocity.y -= 0.015;
+                player.group.position.y += player.velocity.y;
+
+                if (player.group.position.y <= 0) {
+                    player.group.position.y = 0;
+                    player.velocity.y = 0;
+                    player.isJumping = false;
+                }
+
+                // ГРАНИЦЫ
+                const mapSize = 600;
+                player.group.position.x = Math.max(-mapSize, Math.min(mapSize, player.group.position.x));
+                player.group.position.z = Math.max(-mapSize, Math.min(mapSize, player.group.position.z));
+
+                // AI ВРАГОВ
+                enemies.forEach(enemy => {
+                    if (!enemy.caught) {
+                        const dx = player.group.position.x - enemy.group.position.x;
+                        const dz = player.group.position.z - enemy.group.position.z;
+                        const distance = Math.sqrt(dx * dx + dz * dz);
+
+                        // ВИДИТ ИГРОКА
+                        if (distance < enemy.visionRange) {
+                            if (distance > 0.1) {
+                                enemy.group.position.x += (dx / distance) * enemy.speed;
+                                enemy.group.position.z += (dz / distance) * enemy.speed;
+                                enemy.group.rotation.y = Math.atan2(dx, dz);
+                            }
+                        } else {
+                            // БЛУЖДАНИЕ
+                            enemy.wanderTimer--;
+                            if (enemy.wanderTimer <= 0) {
+                                enemy.wanderDir = (Math.random() - 0.5) * 0.08;
+                                enemy.wanderTimer = Math.random() * 200 + 100;
+                            }
+                            enemy.group.rotation.y += enemy.wanderDir;
+                            enemy.group.position.x += Math.sin(enemy.group.rotation.y) * enemy.speed * 0.3;
+                            enemy.group.position.z += Math.cos(enemy.group.rotation.y) * enemy.speed * 0.3;
+                        }
+
+                        enemy.group.position.x = Math.max(-mapSize, Math.min(mapSize, enemy.group.position.x));
+                        enemy.group.position.z = Math.max(-mapSize, Math.min(mapSize, enemy.group.position.z));
+
+                        // ПРОВЕРКА ЛОВЛИ
+                        if (distance < 25) {
+                            enemy.caught = true;
+                            scene.remove(enemy.group);
+                            caughtCount++;
+                            score += 250;
+
+                            showNotification(`✨ ${enemy.name} поймана! ✨`);
+
+                            if (caughtCount === 3) {
+                                endGame();
+                            }
+                        }
+                    }
+                });
+
+                // КАМЕРА
+                const cameraOffsetX = Math.sin(cameraAngle) * cameraDistance;
+                const cameraOffsetZ = Math.cos(cameraAngle) * cameraDistance;
+
+                camera.position.x = player.group.position.x + cameraOffsetX;
+                camera.position.y = player.group.position.y + cameraHeight;
+                camera.position.z = player.group.position.z + cameraOffsetZ;
+                camera.lookAt(player.group.position.x, player.group.position.y + 12, player.group.position.z);
+
+                updateUI();
+                updateMinimap();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function updateUI() {
+            document.getElementById('scoreDisplay').textContent = score;
+            document.getElementById('caughtDisplay').textContent = caughtCount;
+            document.getElementById('healthBar').style.width = (player.health / player.maxHealth * 100) + '%';
+            document.getElementById('levelDisplay').textContent = currentLevel;
+            document.getElementById('locationDisplay').textContent = locations[currentLocation].name;
+
+            // ВРАГИ
+            const enemyList = document.getElementById('enemyList');
+            enemyList.innerHTML = '';
+            enemies.forEach(enemy => {
+                const dist = enemy.group.position.distanceTo(player.group.position);
+                const item = document.createElement('div');
+                item.className = 'enemy-item' + (enemy.caught ? ' caught' : '');
+                item.innerHTML = `
+                    <span>${enemy.caught ? '✅' : '⚠️'} ${enemy.name}</span>
+                    <span class="enemy-distance">${Math.floor(dist)}м</span>
+                `;
+                enemyList.appendChild(item);
+            });
+
+            // АПГРЕЙДЫ
+            const upgradesList = document.getElementById('upgradesList');
+            upgradesList.innerHTML = '';
+            for (let key in upgrades) {
+                const upgrade = upgrades[key];
+                const item = document.createElement('div');
+                item.className = 'upgrade-item' + (upgrade.current > 1 ? ' active' : '');
+                item.innerHTML = `<span>${upgrade.label}</span><span>Ур. ${upgrade.current}/${upgrade.maxLevel}</span>`;
+                upgradesList.appendChild(item);
+            }
+        }
+
+        function updateMinimap() {
+            const canvas = document.getElementById('minimap');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const scale = 200 / 1200;
+
+            ctx.fillStyle = '#001a4d';
+            ctx.fillRect(0, 0, 200, 200);
+
+            // ВРАГИ
+            enemies.forEach(enemy => {
+                if (!enemy.caught) {
+                    ctx.fillStyle = '#FF0000';
+                    ctx.beginPath();
+                    ctx.arc(
+                        100 + enemy.group.position.x * scale,
+                        100 + enemy.group.position.z * scale,
+                        5,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            });
+
+            // ИГРОК
+            ctx.fillStyle = '#00FF00';
+            ctx.beginPath();
+            ctx.arc(100 + player.group.position.x * scale, 100 + player.group.position.z * scale, 7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function showNotification(text) {
+            const notification = document.getElementById('notification');
+            document.getElementById('notificationText').textContent = text;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 1500);
+        }
+
+        function endGame() {
+            gameOver = true;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            document.getElementById('finalCaught').textContent = caughtCount;
+            document.getElementById('finalScore').textContent = score;
+            
+            const minutes = Math.floor(gameTime / 60);
+            const seconds = Math.floor(gameTime % 60);
+            document.getElementById('finalTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            let bestUpgrade = 'Без апгрейдов';
+            for (let key in upgrades) {
+                if (upgrades[key].current > 1) {
+                    bestUpgrade = upgrades[key].label;
+                    break;
+                }
+            }
+            document.getElementById('finalUpgrade').textContent = bestUpgrade;
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
