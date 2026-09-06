@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 DISNEY HUNTER - Ultimate Edition</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Arial', sans-serif; }
+        body { background: #000; }
+        #gameContainer { width: 100%; height: 100%; }
+        canvas { display: block; width: 100%; height: 100%; }
+        
+        .ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; font-family: 'Courier New', monospace; }
+        .panel { background: rgba(0,0,0,0.85); border: 2px solid #00FF00; border-radius: 5px; padding: 15px; color: #00FF00; font-size: 12px; position: fixed; z-index: 10; }
+        .stats-panel { top: 20px; left: 20px; min-width: 300px; }
+        .enemy-panel { top: 20px; right: 20px; min-width: 300px; border-color: #FF0000; color: #FF0000; }
+        .minimap-panel { bottom: 20px; right: 20px; width: 220px; height: 220px; border: 2px solid #00FFFF; border-radius: 5px; }
+        .controls { bottom: 20px; left: 50%; transform: translateX(-50%); text-align: center; border-color: #00FFFF; color: #00FFFF; font-size: 11px; }
+        
+        .stat-line { margin: 6px 0; display: flex; justify-content: space-between; align-items: center; }
+        .stat-label { color: #00FFFF; font-weight: bold; min-width: 100px; }
+        .stat-value { color: #00FF00; font-weight: bold; }
+        .stat-bar { background: rgba(0,255,0,0.2); border: 1px solid #00FF00; width: 120px; height: 8px; border-radius: 2px; overflow: hidden; }
+        .stat-bar-fill { background: linear-gradient(90deg, #00FF00, #00FFFF); height: 100%; transition: width 0.3s; }
+        
+        .enemy-entry { margin: 6px 0; padding: 6px; background: rgba(255,0,0,0.1); border-left: 2px solid #FF0000; border-radius: 2px; display: flex; justify-content: space-between; }
+        .enemy-entry.caught { background: rgba(0,255,0,0.15); border-left-color: #00FF00; text-decoration: line-through; color: #00FF00; }
+        .enemy-dist { font-size: 11px; color: #00FFFF; }
+        
+        #minimap { width: 100%; height: 100%; border-radius: 3px; }
+        
+        .crosshair { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; pointer-events: none; z-index: 5; }
+        .crosshair svg { width: 100%; height: 100%; }
+        
+        .notification { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); color: #00FF00; padding: 40px; border: 3px solid #00FF00; border-radius: 10px; font-size: 32px; font-weight: bold; display: none; pointer-events: none; z-index: 200; text-shadow: 0 0 20px #00FF00; }
+        
+        .menu { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0a0e27, #1a1a3e); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+        .menu h1 { font-size: 72px; color: #00FF00; margin-bottom: 20px; text-shadow: 0 0 40px #00FF00; }
+        .menu .subtitle { font-size: 24px; color: #00FFFF; margin-bottom: 50px; }
+        .menu button { padding: 16px 50px; margin: 12px; font-size: 18px; background: #00FF00; color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: all 0.3s; font-family: 'Arial', sans-serif; }
+        .menu button:hover { background: #00FFFF; transform: scale(1.1); box-shadow: 0 0 25px #00FFFF; }
+        
+        .game-over { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 500; }
+        .game-over h1 { font-size: 64px; color: #00FF00; margin-bottom: 30px; text-shadow: 0 0 40px #00FF00; }
+        .game-over .stats { background: rgba(0,255,0,0.1); padding: 30px; border: 2px solid #00FF00; border-radius: 10px; margin: 20px 0; }
+        .game-over p { font-size: 24px; color: #00FFFF; margin: 15px; }
+        .game-over button { padding: 16px 50px; margin-top: 30px; font-size: 18px; background: #00FF00; color: #000; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+        .loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #0a0e27, #1a1a3e); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; }
+        .loading h2 { color: #00FF00; font-size: 28px; margin-bottom: 30px; text-shadow: 0 0 20px #00FF00; }
+        .loading-bar { width: 300px; height: 20px; border: 2px solid #00FF00; border-radius: 5px; overflow: hidden; }
+        .loading-progress { background: linear-gradient(90deg, #00FF00, #00FFFF); height: 100%; width: 0%; transition: width 0.1s; }
+        .loading-text { color: #00FFFF; margin-top: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="loading" id="loading">
+        <h2>🏰 DISNEY HUNTER</h2>
+        <div class="loading-bar"><div class="loading-progress" id="loadProgress"></div></div>
+        <div class="loading-text" id="loadText">Инициализация движка...</div>
+    </div>
+
+    <div class="menu" id="menu" style="display: none;">
+        <h1>🏰 DISNEY HUNTER</h1>
+        <div class="subtitle">Ultimate Edition | Professional Game Engine</div>
+        <button onclick="startGame()">▶ START GAME</button>
+        <button onclick="showInfo()">ℹ GAME INFO</button>
+    </div>
+
+    <div class="game-over" id="gameOverScreen">
+        <h1>🎉 VICTORY!</h1>
+        <div class="stats">
+            <p>All Enemies Caught!</p>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <p>Game Time: <span id="finalTime">0:00</span></p>
+            <p>Difficulty: <span id="finalDiff">Normal</span></p>
+            <p>Accuracy: <span id="finalAccuracy">100</span>%</p>
+        </div>
+        <button onclick="location.reload()">🔄 PLAY AGAIN</button>
+    </div>
+
+    <div class="ui">
+        <div class="panel stats-panel">
+            <div class="stat-line"><span class="stat-label">▸ SCORE</span><span class="stat-value" id="score">0</span></div>
+            <div class="stat-line"><span class="stat-label">▸ ENEMIES</span><span class="stat-value" id="caught">0</span>/3</div>
+            <div class="stat-line"><span class="stat-label">▸ HEALTH</span></div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="healthBar" style="width: 100%;"></div></div>
+            <div class="stat-line"><span class="stat-label">▸ TIME</span><span class="stat-value" id="time">0:00</span></div>
+            <div class="stat-line"><span class="stat-label">▸ FPS</span><span class="stat-value" id="fps">60</span></div>
+            <div class="stat-line"><span class="stat-label">▸ LEVEL</span><span class="stat-value" id="level">1</span></div>
+            <div class="stat-line"><span class="stat-label">▸ SPEED</span><span class="stat-value" id="speed">1.0x</span></div>
+            <div class="stat-line"><span class="stat-label">▸ ZONE</span><span class="stat-value" id="zone">PARK</span></div>
+        </div>
+
+        <div class="panel enemy-panel">
+            <div style="font-weight: bold; margin-bottom: 10px; color: #FF0000;">[ THREAT ASSESSMENT ]</div>
+            <div id="enemyList"></div>
+        </div>
+
+        <div class="panel controls">
+            🎮 WASD - Move | 🖱️ Mouse - Look | Space - Jump | Click - Catch
+        </div>
+
+        <div class="minimap-panel">
+            <canvas id="minimap" width="220" height="220"></canvas>
+        </div>
+    </div>
+
+    <div class="crosshair">
+        <svg viewBox="0 0 50 50">
+            <circle cx="25" cy="25" r="12" fill="none" stroke="#00FF00" stroke-width="1.5"/>
+            <line x1="25" y1="0" x2="25" y2="8" stroke="#00FF00" stroke-width="1.5"/>
+            <line x1="25" y1="42" x2="25" y2="50" stroke="#00FF00" stroke-width="1.5"/>
+            <line x1="0" y1="25" x2="8" y2="25" stroke="#00FF00" stroke-width="1.5"/>
+            <line x1="42" y1="25" x2="50" y2="25" stroke="#00FF00" stroke-width="1.5"/>
+            <circle cx="25" cy="25" r="2" fill="#00FF00"/>
+        </svg>
+    </div>
+
+    <div class="notification" id="notification"></div>
+    <div id="gameContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ===== CANVAS TEXTURE GENERATOR =====
+        function generateCanvasTexture(width, height, type = 'noise') {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            if (type === 'noise') {
+                const imageData = ctx.createImageData(width, height);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const val = Math.random() * 200 + 55;
+                    data[i] = val;
+                    data[i + 1] = val;
+                    data[i + 2] = val;
+                    data[i + 3] = 255;
+                }
+                ctx.putImageData(imageData, 0, 0);
+            } else if (type === 'grass') {
+                const imageData = ctx.createImageData(width, height);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = 100 + Math.random() * 80;
+                    const g = 150 + Math.random() * 80;
+                    const b = 60 + Math.random() * 40;
+                    data[i] = r;
+                    data[i + 1] = g;
+                    data[i + 2] = b;
+                    data[i + 3] = 255;
+                }
+                ctx.putImageData(imageData, 0, 0);
+            } else if (type === 'stone') {
+                const imageData = ctx.createImageData(width, height);
+                const data = imageData.data;
+                for (let i = 0; i < data.length; i += 4) {
+                    const val = 120 + Math.random() * 60;
+                    data[i] = val;
+                    data[i + 1] = val - 10;
+                    data[i + 2] = val - 20;
+                    data[i + 3] = 255;
+                }
+                ctx.putImageData(imageData, 0, 0);
+            } else if (type === 'wood') {
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const noise = Math.sin(y * 0.05) * 50 + 100;
+                        const r = 139 + noise * 0.3;
+                        const g = 90 + noise * 0.2;
+                        const b = 43 + noise * 0.1;
+                        ctx.fillStyle = `rgb(${r},${g},${b})`;
+                        ctx.fillRect(x, y, 1, 1);
+                    }
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.magFilter = THREE.LinearFilter;
+            texture.minFilter = THREE.LinearMipmapLinearFilter;
+            return texture;
+        }
+
+        // ===== GAME STATE =====
+        let gameState = {
+            started: false,
+            over: false,
+            score: 0,
+            caughtCount: 0,
+            gameTime: 0,
+            fps: 60,
+            frameCount: 0,
+            lastFrameTime: Date.now(),
+            level: 1,
+            speedMultiplier: 1.0,
+            zone: 'PARK'
+        };
+
+        // ===== THREE.JS SETUP =====
+        let scene, camera, renderer, composer;
+        let player = {}, enemies = [], world = {};
+        let loadProgress = 0;
+
+        function updateLoadProgress(percent, text) {
+            loadProgress = percent;
+            document.getElementById('loadProgress').style.width = percent + '%';
+            document.getElementById('loadText').textContent = text;
+        }
+
+        function initGame() {
+            updateLoadProgress(10, 'Инициализация сцены...');
+            
+            const container = document.getElementById('gameContainer');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 1000, 3000);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
+            camera.position.set(0, 15, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFShadowShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.physicallyCorrectLights = true;
+            container.appendChild(renderer.domElement);
+
+            updateLoadProgress(20, 'Устанавливаем освещение...');
+            setupLighting();
+
+            updateLoadProgress(35, 'Генерируем мир...');
+            generateWorld();
+
+            updateLoadProgress(55, 'Создаем игрока...');
+            createPlayer();
+
+            updateLoadProgress(70, 'Создаем врагов...');
+            createEnemies();
+
+            updateLoadProgress(85, 'Настраиваем управление...');
+            setupControls();
+
+            updateLoadProgress(100, 'Игра готова!');
+            
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('menu').style.display = 'flex';
+                document.getElementById('menu').style.justifyContent = 'center';
+            }, 500);
+        }
+
+        function setupLighting() {
+            const ambient = new THREE.AmbientLight(0xffffff, 0.75);
+            scene.add(ambient);
+
+            const sun = new THREE.DirectionalLight(0xffffff, 1);
+            sun.position.set(400, 300, 300);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 4096;
+            sun.shadow.mapSize.height = 4096;
+            sun.shadow.camera.far = 2500;
+            sun.shadow.camera.left = -1500;
+            sun.shadow.camera.right = 1500;
+            sun.shadow.camera.top = 1500;
+            sun.shadow.camera.bottom = -1500;
+            sun.shadow.bias = -0.0008;
+            scene.add(sun);
+
+            for (let i = 0; i < 8; i++) {
+                const light = new THREE.PointLight(0xffff99, 0.4, 250);
+                light.position.set(
+                    (Math.random() - 0.5) * 1000,
+                    120,
+                    (Math.random() - 0.5) * 1000
+                );
+                scene.add(light);
+            }
+        }
+
+        function generateWorld() {
+            // GROUND
+            const grassTex = generateCanvasTexture(512, 512, 'grass');
+            const groundGeom = new THREE.PlaneGeometry(2000, 2000);
+            const groundMat = new THREE.MeshStandardMaterial({
+                map: grassTex,
+                roughness: 0.85,
+                metalness: 0
+            });
+            const ground = new THREE.Mesh(groundGeom, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // DETAILED GRASS
+            const grassTex2 = generateCanvasTexture(256, 256, 'grass');
+            for (let x = -800; x <= 800; x += 120) {
+                for (let z = -800; z <= 800; z += 120) {
+                    const count = 8 + Math.random() * 12;
+                    for (let i = 0; i < count; i++) {
+                        const h = 10 + Math.random() * 12;
+                        const blade = new THREE.Mesh(
+                            new THREE.ConeGeometry(1.2, h, 4),
+                            new THREE.MeshStandardMaterial({
+                                color: new THREE.Color().setHSL(
+                                    0.35 + Math.random() * 0.08,
+                                    0.65 + Math.random() * 0.25,
+                                    0.35 + Math.random() * 0.2
+                                ),
+                                roughness: 0.95
+                            })
+                        );
+                        blade.position.set(
+                            x + Math.random() * 100,
+                            h / 2 + 1,
+                            z + Math.random() * 100
+                        );
+                        blade.rotation.z = Math.random() * 0.5 - 0.25;
+                        blade.castShadow = true;
+                        scene.add(blade);
+                    }
+                }
+            }
+
+            buildMagicalCastle();
+            buildForest();
+            buildParks();
+            buildTerrainDetails();
+        }
+
+        function buildMagicalCastle() {
+            const stoneTex = generateCanvasTexture(512, 512, 'stone');
+            const woodTex = generateCanvasTexture(256, 256, 'wood');
+
+            // MAIN BASE
+            const baseGeom = new THREE.CylinderGeometry(85, 100, 40, 32);
+            const baseMat = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.8 });
+            const base = new THREE.Mesh(baseGeom, baseMat);
+            base.position.y = 20;
+            base.castShadow = true;
+            base.receiveShadow = true;
+            scene.add(base);
+
+            // MAIN TOWER
+            const towerGeom = new THREE.CylinderGeometry(80, 75, 250, 32);
+            const tower = new THREE.Mesh(towerGeom, baseMat);
+            tower.position.y = 145;
+            tower.castShadow = true;
+            tower.receiveShadow = true;
+            scene.add(tower);
+
+            // MAIN ROOF
+            const roofGeom = new THREE.ConeGeometry(100, 140, 32);
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0xFF1493, roughness: 0.6 });
+            const roof = new THREE.Mesh(roofGeom, roofMat);
+            roof.position.y = 320;
+            roof.castShadow = true;
+            scene.add(roof);
+
+            // SPIRE
+            const spireGeom = new THREE.ConeGeometry(20, 80, 20);
+            const spireMat = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.9 });
+            const spire = new THREE.Mesh(spireGeom, spireMat);
+            spire.position.y = 380;
+            spire.castShadow = true;
+            scene.add(spire);
+
+            // 4 CORNER TOWERS
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+                const x = Math.cos(angle) * 140;
+                const z = Math.sin(angle) * 140;
+
+                const towerGeom = new THREE.CylinderGeometry(50, 50, 220, 24);
+                const tower = new THREE.Mesh(towerGeom, baseMat);
+                tower.position.set(x, 110, z);
+                tower.castShadow = true;
+                tower.receiveShadow = true;
+                scene.add(tower);
+
+                const roofGeom = new THREE.ConeGeometry(65, 100, 24);
+                const roof = new THREE.Mesh(roofGeom, roofMat);
+                roof.position.set(x, 270, z);
+                roof.castShadow = true;
+                scene.add(roof);
+
+                const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 70, 8), new THREE.MeshStandardMaterial({ color: 0x654321 }));
+                flagPole.position.set(x, 310, z);
+                scene.add(flagPole);
+
+                const flag = new THREE.Mesh(new THREE.PlaneGeometry(50, 35), new THREE.MeshStandardMaterial({ color: 0xFFFFFF }));
+                flag.position.set(x + 30, 310, z);
+                scene.add(flag);
+            }
+
+            // CASTLE WALLS
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const x = Math.cos(angle) * 120;
+                const z = Math.sin(angle) * 120;
+                
+                const wallGeom = new THREE.BoxGeometry(120, 60, 20);
+                const wall = new THREE.Mesh(wallGeom, baseMat);
+                wall.position.set(x, 30, z);
+                wall.castShadow = true;
+                wall.receiveShadow = true;
+                scene.add(wall);
+            }
+        }
+
+        function buildForest() {
+            const woodTex = generateCanvasTexture(256, 256, 'wood');
+            const areas = [
+                { x: -500, z: -500, count: 15 },
+                { x: 500, z: -500, count: 13 },
+                { x: -500, z: 500, count: 14 },
+                { x: 500, z: 500, count: 12 }
+            ];
+
+            areas.forEach(area => {
+                for (let t = 0; t < area.count; t++) {
+                    const ox = (Math.random() - 0.5) * 200;
+                    const oz = (Math.random() - 0.5) * 200;
+                    const h = 100 + Math.random() * 140;
+
+                    const trunkGeom = new THREE.CylinderGeometry(22, 32, h, 12);
+                    const trunk = new THREE.Mesh(trunkGeom, new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.9 }));
+                    trunk.position.set(area.x + ox, h / 2, area.z + oz);
+                    trunk.castShadow = true;
+                    trunk.receiveShadow = true;
+                    scene.add(trunk);
+
+                    const foliageCount = 4 + Math.random() * 5;
+                    for (let f = 0; f < foliageCount; f++) {
+                        const fGeom = new THREE.SphereGeometry(55 - f * 10, 14, 14);
+                        const fMat = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color().setHSL(0.32 + Math.random() * 0.1, 0.7 + Math.random() * 0.2, 0.4 + Math.random() * 0.15),
+                            roughness: 0.75
+                        });
+                        const foliage = new THREE.Mesh(fGeom, fMat);
+                        foliage.position.set(area.x + ox, h + 50 + f * 50, area.z + oz);
+                        foliage.castShadow = true;
+                        scene.add(foliage);
+                    }
+                }
+            });
+        }
+
+        function buildParks() {
+            // CAROUSEL
+            const carouselBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(150, 150, 40, 32),
+                new THREE.MeshStandardMaterial({ color: 0xFF1493, roughness: 0.7 })
+            );
+            carouselBase.position.set(-400, 20, -400);
+            carouselBase.castShadow = true;
+            scene.add(carouselBase);
+
+            const carouselPole = new THREE.Mesh(
+                new THREE.CylinderGeometry(25, 25, 250, 16),
+                new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+            );
+            carouselPole.position.set(-400, 125, -400);
+            carouselPole.castShadow = true;
+            scene.add(carouselPole);
+
+            const carouselTop = new THREE.Mesh(
+                new THREE.CylinderGeometry(170, 170, 50, 32),
+                new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.5 })
+            );
+            carouselTop.position.set(-400, 210, -400);
+            carouselTop.castShadow = true;
+            scene.add(carouselTop);
+
+            // FERRIS WHEEL
+            for (let i = 0; i < 15; i++) {
+                const angle = (i / 15) * Math.PI * 2;
+                const x = Math.cos(angle) * 150;
+                const y = Math.sin(angle) * 150;
+                
+                const cabin = new THREE.Mesh(
+                    new THREE.BoxGeometry(40, 40, 35),
+                    new THREE.MeshStandardMaterial({ color: 0x00BFFF, roughness: 0.6 })
+                );
+                cabin.position.set(400 + x, 120 + y, -400);
+                cabin.castShadow = true;
+                scene.add(cabin);
+            }
+
+            // FOUNTAIN
+            const fountainBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(120, 150, 30, 32),
+                new THREE.MeshStandardMaterial({ color: 0xB0C4DE })
+            );
+            fountainBase.position.set(400, 15, 400);
+            fountainBase.castShadow = true;
+            scene.add(fountainBase);
+
+            const fountainPipe = new THREE.Mesh(
+                new THREE.CylinderGeometry(50, 50, 180, 20),
+                new THREE.MeshStandardMaterial({ color: 0x4169E1, metalness: 0.5 })
+            );
+            fountainPipe.position.set(400, 90, 400);
+            fountainPipe.castShadow = true;
+            scene.add(fountainPipe);
+
+            const fountainTop = new THREE.Mesh(
+                new THREE.SphereGeometry(110, 24, 24),
+                new THREE.MeshStandardMaterial({ color: 0x87CEEB, metalness: 0.7 })
+            );
+            fountainTop.position.set(400, 190, 400);
+            scene.add(fountainTop);
+        }
+
+        function buildTerrainDetails() {
+            // HILLS
+            for (let i = 0; i < 12; i++) {
+                const hill = new THREE.Mesh(
+                    new THREE.SphereGeometry(120 + Math.random() * 100, 16, 16),
+                    new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(0.35, 0.5, 0.5),
+                        roughness: 0.95
+                    })
+                );
+                hill.position.set(
+                    (Math.random() - 0.5) * 1600,
+                    40 + Math.random() * 70,
+                    (Math.random() - 0.5) * 1600
+                );
+                hill.castShadow = true;
+                hill.receiveShadow = true;
+                scene.add(hill);
+            }
+
+            // ROCKS
+            for (let i = 0; i < 40; i++) {
+                const rock = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(20 + Math.random() * 40, 0),
+                    new THREE.MeshStandardMaterial({
+                        color: new THREE.Color().setHSL(0.08, 0.2, 0.4),
+                        roughness: 0.95
+                    })
+                );
+                rock.position.set(
+                    (Math.random() - 0.5) * 1800,
+                    25,
+                    (Math.random() - 0.5) * 1800
+                );
+                rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                scene.add(rock);
+            }
+
+            // WATER AREAS
+            for (let i = 0; i < 5; i++) {
+                const water = new THREE.Mesh(
+                    new THREE.PlaneGeometry(300 + Math.random() * 200, 300 + Math.random() * 200),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x1E90FF,
+                        metalness: 0.8,
+                        roughness: 0.2
+                    })
+                );
+                water.rotation.x = -Math.PI / 2;
+                water.position.y = 0.5;
+                water.position.set(
+                    (Math.random() - 0.5) * 1600,
+                    0.5,
+                    (Math.random() - 0.5) * 1600
+                );
+                scene.add(water);
+            }
+        }
+
+        function createPlayer() {
+            const redMat = new THREE.MeshStandardMaterial({ color: 0xFF0000, roughness: 0.6 });
+            const blackMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+            
+            const playerGroup = new THREE.Group();
+
+            const body = new THREE.Mesh(new THREE.SphereGeometry(12, 20, 20), redMat);
+            body.position.y = 12;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            playerGroup.add(body);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(11, 20, 20), redMat);
+            head.position.y = 26;
+            head.castShadow = true;
+            head.receiveShadow = true;
+            playerGroup.add(head);
+
+            for (let side of [-1, 1]) {
+                const ear = new THREE.Mesh(new THREE.SphereGeometry(6, 12, 12), redMat);
+                ear.position.set(side * 12, 32, 0);
+                ear.scale.set(0.9, 1.1, 0.7);
+                ear.castShadow = true;
+                playerGroup.add(ear);
+
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(3, 10, 10), new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
+                eye.position.set(side * 5, 27, 9);
+                playerGroup.add(eye);
+
+                const pupil = new THREE.Mesh(new THREE.SphereGeometry(1.5, 8, 8), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+                pupil.position.set(side * 5, 27, 9.5);
+                playerGroup.add(pupil);
+
+                const arm = new THREE.Mesh(new THREE.CylinderGeometry(5, 4, 18, 10), blackMat);
+                arm.position.set(side * 15, 16, 0);
+                arm.castShadow = true;
+                arm.receiveShadow = true;
+                playerGroup.add(arm);
+
+                const leg = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 16, 10), blackMat);
+                leg.position.set(side * 7, 2, 0);
+                leg.castShadow = true;
+                leg.receiveShadow = true;
+                playerGroup.add(leg);
+            }
+
+            playerGroup.position.set(0, 0, 0);
+            scene.add(playerGroup);
+
+            player = {
+                group: playerGroup,
+                velocity: new THREE.Vector3(0, 0, 0),
+                speed: 0.28,
+                jumpPower: 0.65,
+                isJumping: false,
+                health: 4,
+                maxHealth: 4,
+                yaw: 0,
+                pitch: 0
+            };
+        }
+
+        function createEnemies() {
+            const configs = [
+                { name: '█ GUMBA', color: 0x8B4513, pos: new THREE.Vector3(180, 0, 180), scale: 1.0, speed: 0.16 },
+                { name: '■ CAPTAIN HOOK', color: 0x800000, pos: new THREE.Vector3(-180, 0, 180), scale: 1.15, speed: 0.14 },
+                { name: '▲ MALEFICENT', color: 0x4B0082, pos: new THREE.Vector3(180, 0, -180), scale: 1.2, speed: 0.17 }
+            ];
+
+            enemies = configs.map(cfg => {
+                const group = new THREE.Group();
+                const s = cfg.scale;
+                const mat = new THREE.MeshStandardMaterial({ color: cfg.color, roughness: 0.65 });
+
+                const body = new THREE.Mesh(new THREE.SphereGeometry(9 * s, 16, 16), mat);
+                body.position.y = 9 * s;
+                body.castShadow = true;
+                body.receiveShadow = true;
+                group.add(body);
+
+                const head = new THREE.Mesh(new THREE.SphereGeometry(8 * s, 16, 16), mat);
+                head.position.y = 22 * s;
+                head.castShadow = true;
+                group.add(head);
+
+                for (let side of [-1, 1]) {
+                    const eye = new THREE.Mesh(new THREE.SphereGeometry(2.5 * s, 10, 10), new THREE.MeshBasicMaterial({ color: 0xFFFFFF }));
+                    eye.position.set(side * 4 * s, 23 * s, 7.5 * s);
+                    group.add(eye);
+
+                    const pupil = new THREE.Mesh(new THREE.SphereGeometry(1.2 * s, 8, 8), new THREE.MeshBasicMaterial({ color: 0xFF0000 }));
+                    pupil.position.set(side * 4 * s, 23 * s, 8 * s);
+                    group.add(pupil);
+
+                    const leg = new THREE.Mesh(new THREE.CylinderGeometry(3.5 * s, 3.5 * s, 12 * s, 8), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+                    leg.position.set(side * 4.5 * s, 1 * s, 0);
+                    leg.castShadow = true;
+                    leg.receiveShadow = true;
+                    group.add(leg);
+                }
+
+                group.position.copy(cfg.pos);
+                scene.add(group);
+
+                return {
+                    name: cfg.name,
+                    group: group,
+                    position: cfg.pos.clone(),
+                    velocity: new THREE.Vector3(0, 0, 0),
+                    speed: cfg.speed,
+                    health: 1,
+                    caught: false,
+                    visionRange: 180,
+                    wanderTimer: 0,
+                    targetAngle: Math.random() * Math.PI * 2,
+                    lastSeen: null,
+                    evasion: 0.4 + Math.random() * 0.6,
+                    scale: s
+                };
+            });
+        }
+
+        const keys = {};
+        let mousePressed = false;
+
+        function setupControls() {
+            window.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                keys[e.key] = true;
+            });
+
+            window.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+                keys[e.key] = false;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                const dX = e.movementX || 0;
+                const dY = e.movementY || 0;
+                player.yaw -= dX * 0.0035;
+                player.pitch -= dY * 0.0035;
+                player.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, player.pitch));
+                camera.rotation.order = 'YXZ';
+                camera.rotation.y = player.yaw;
+                camera.rotation.x = player.pitch;
+            });
+
+            window.addEventListener('click', () => {
+                mousePressed = true;
+                setTimeout(() => { mousePressed = false; }, 80);
+            });
+
+            document.addEventListener('click', () => {
+                document.documentElement.requestPointerLock = document.documentElement.requestPointerLock || document.documentElement.mozRequestPointerLock;
+                document.documentElement.requestPointerLock();
+            });
+        }
+
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+            if (!gameState.started) return;
+
+            gameState.gameTime += 1 / 60;
+            gameState.frameCount++;
+
+            if (Date.now() - gameState.lastFrameTime >= 1000) {
+                gameState.fps = gameState.frameCount;
+                gameState.frameCount = 0;
+                gameState.lastFrameTime = Date.now();
+            }
+
+            // PLAYER MOVE
+            const forward = new THREE.Vector3(0, 0, -1);
+            const right = new THREE.Vector3(1, 0, 0);
+            forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
+            right.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
+
+            const move = new THREE.Vector3();
+            if (keys['w'] || keys['W'] || keys['ArrowUp']) move.add(forward);
+            if (keys['s'] || keys['S'] || keys['ArrowDown']) move.sub(forward);
+            if (keys['a'] || keys['A'] || keys['ArrowLeft']) move.sub(right);
+            if (keys['d'] || keys['D'] || keys['ArrowRight']) move.add(right);
+
+            if (move.length() > 0) {
+                move.normalize();
+                player.group.position.add(move.multiplyScalar(player.speed * gameState.speedMultiplier));
+            }
+
+            if ((keys[' '] || keys['Spacebar']) && !player.isJumping) {
+                player.velocity.y = player.jumpPower;
+                player.isJumping = true;
+            }
+
+            player.velocity.y -= 0.03;
+            player.group.position.y += player.velocity.y;
+            if (player.group.position.y <= 0) {
+                player.group.position.y = 0;
+                player.velocity.y = 0;
+                player.isJumping = false;
+            }
+
+            const bound = 700;
+            player.group.position.x = Math.max(-bound, Math.min(bound, player.group.position.x));
+            player.group.position.z = Math.max(-bound, Math.min(bound, player.group.position.z));
+
+            // ENEMIES
+            enemies.forEach(enemy => {
+                if (enemy.caught) return;
+
+                const dist = enemy.group.position.distanceTo(player.group.position);
+                
+                if (dist < enemy.visionRange) {
+                    enemy.lastSeen = player.group.position.clone();
+                    const dir = new THREE.Vector3().subVectors(player.group.position, enemy.group.position).normalize();
+                    enemy.group.position.add(dir.multiplyScalar(enemy.speed * (0.5 + enemy.evasion)));
+                    enemy.group.rotation.y = Math.atan2(dir.x, dir.z);
+
+                    if (dist < 20 * enemy.scale && mousePressed) {
+                        catchEnemy(enemy);
+                    }
+                } else {
+                    enemy.wanderTimer--;
+                    if (enemy.wanderTimer <= 0) {
+                        enemy.targetAngle = Math.random() * Math.PI * 2;
+                        enemy.wanderTimer = 80 + Math.random() * 120;
+                    }
+                    const wander = new THREE.Vector3(Math.sin(enemy.targetAngle), 0, Math.cos(enemy.targetAngle));
+                    enemy.group.position.add(wander.multiplyScalar(enemy.speed * 0.3));
+                    enemy.group.rotation.y = enemy.targetAngle;
+                }
+
+                enemy.group.position.x = Math.max(-bound, Math.min(bound, enemy.group.position.x));
+                enemy.group.position.z = Math.max(-bound, Math.min(bound, enemy.group.position.z));
+            });
+
+            // CAMERA
+            const camOffset = new THREE.Vector3(0, 14, 32);
+            camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
+            camera.position.x = player.group.position.x + camOffset.x;
+            camera.position.y = player.group.position.y + camOffset.y;
+            camera.position.z = player.group.position.z + camOffset.z;
+
+            updateHUD();
+            updateMinimap();
+            renderer.render(scene, camera);
+        }
+
+        function catchEnemy(enemy) {
+            enemy.caught = true;
+            scene.remove(enemy.group);
+            gameState.caughtCount++;
+            gameState.score += 2000 + gameState.level * 800;
+            showNotification(`✓ ${enemy.name.trim()}`);
+            updateHUD();
+            if (gameState.caughtCount === 3) endGame();
+        }
+
+        function updateHUD() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('caught').textContent = gameState.caughtCount;
+            document.getElementById('healthBar').style.width = (player.health / player.maxHealth * 100) + '%';
+            document.getElementById('fps').textContent = gameState.fps;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('speed').textContent = gameState.speedMultiplier.toFixed(1) + 'x';
+
+            const m = Math.floor(gameState.gameTime / 60);
+            const s = Math.floor(gameState.gameTime % 60);
+            document.getElementById('time').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+
+            const list = document.getElementById('enemyList');
+            list.innerHTML = '';
+            enemies.forEach(e => {
+                const d = Math.floor(e.group.position.distanceTo(player.group.position));
+                const entry = document.createElement('div');
+                entry.className = 'enemy-entry' + (e.caught ? ' caught' : '');
+                entry.innerHTML = `<span>${e.name}</span><span class="enemy-dist">${d}m</span>`;
+                list.appendChild(entry);
+            });
+        }
+
+        function updateMinimap() {
+            const canvas = document.getElementById('minimap');
+            const ctx = canvas.getContext('2d');
+            const scale = 220 / 1600;
+
+            ctx.fillStyle = '#0a0a1a';
+            ctx.fillRect(0, 0, 220, 220);
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, 0, 220, 220);
+
+            ctx.strokeStyle = '#003300';
+            for (let i = 0; i < 5; i++) {
+                const p = i * 55;
+                ctx.beginPath();
+                ctx.moveTo(p, 0);
+                ctx.lineTo(p, 220);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, p);
+                ctx.lineTo(220, p);
+                ctx.stroke();
+            }
+
+            enemies.forEach(e => {
+                if (!e.caught) {
+                    ctx.fillStyle = '#FF0000';
+                    ctx.beginPath();
+                    ctx.arc(110 + e.group.position.x * scale, 110 + e.group.position.z * scale, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            ctx.fillStyle = '#00FF00';
+            ctx.beginPath();
+            ctx.arc(110 + player.group.position.x * scale, 110 + player.group.position.z * scale, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(110 + player.group.position.x * scale, 110 + player.group.position.z * scale);
+            ctx.lineTo(110 + player.group.position.x * scale + Math.sin(player.yaw) * 18, 110 + player.group.position.z * scale + Math.cos(player.yaw) * 18);
+            ctx.stroke();
+        }
+
+        function showNotification(text) {
+            const notif = document.getElementById('notification');
+            notif.textContent = text;
+            notif.style.display = 'block';
+            setTimeout(() => { notif.style.display = 'none'; }, 1000);
+        }
+
+        function endGame() {
+            gameState.started = false;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            document.getElementById('finalScore').textContent = gameState.score;
+            const m = Math.floor(gameState.gameTime / 60);
+            const s = Math.floor(gameState.gameTime % 60);
+            document.getElementById('finalTime').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+            document.getElementById('finalDiff').textContent = 'NORMAL';
+            document.getElementById('finalAccuracy').textContent = '100';
+        }
+
+        function startGame() {
+            document.getElementById('menu').style.display = 'none';
+            gameState.started = true;
+            gameLoop();
+        }
+
+        function showInfo() {
+            alert('DISNEY HUNTER - Ultimate Edition\n\n🏰 Поймайте всех 3 врагов в волшебном королевстве!\n\n⌨️ WASD - Движение\n🖱️ Mouse - Камера\n🔑 Space - Прыжок\n🖱️ Click - Поймать врага\n\nУдачи, охотник!');
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // START INITIALIZATION
+        window.addEventListener('load', () => {
+            setTimeout(initGame, 500);
+        });
+    </script>
+</body>
+</html>
