@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Догонялки Диснея</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 2.5em;
+        }
+
+        .game-info {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+
+        #gameCanvas {
+            border: 4px solid white;
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 50%, #90EE90 100%);
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .controls {
+            color: white;
+            margin-top: 20px;
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .controls h3 {
+            margin-bottom: 10px;
+        }
+
+        .controls p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .stats {
+            color: white;
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        button {
+            background: #FF6B9D;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #FF1493;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏰 Догонялки Диснея 🏰</h1>
+        <div class="game-info">
+            <p>Помогите Микки убежать от Гумба! Собирайте звёзды! ⭐</p>
+        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="stats">
+            <p>Звёзды: <span id="stars">0</span> | Здоровье: <span id="health">❤️❤️❤️</span></p>
+        </div>
+        <div class="controls">
+            <h3>🎮 Управление:</h3>
+            <p>⬅️ ➡️ ⬆️ ⬇️ - движение (или WASD)</p>
+            <p>Собирайте ⭐ звёзды, избегайте врагов!</p>
+            <button onclick="location.reload()">🔄 Заново</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Персонажи
+        const player = {
+            x: 100,
+            y: 100,
+            width: 40,
+            height: 40,
+            speed: 5,
+            vx: 0,
+            vy: 0,
+            emoji: '🐭',
+            health: 3
+        };
+
+        const enemy = {
+            x: 700,
+            y: 500,
+            width: 40,
+            height: 40,
+            speed: 3,
+            emoji: '👹'
+        };
+
+        let stars = [];
+        let score = 0;
+        let gameOver = false;
+
+        // Создание звёзд
+        function createStars() {
+            stars = [];
+            for (let i = 0; i < 8; i++) {
+                stars.push({
+                    x: Math.random() * (canvas.width - 40),
+                    y: Math.random() * (canvas.height - 40),
+                    width: 30,
+                    height: 30,
+                    emoji: '⭐'
+                });
+            }
+        }
+
+        // Управление
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(e.key.toLowerCase())) {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // Обновление позиции игрока
+        function updatePlayer() {
+            player.vx = 0;
+            player.vy = 0;
+
+            if (keys['arrowleft'] || keys['a']) player.vx = -player.speed;
+            if (keys['arrowright'] || keys['d']) player.vx = player.speed;
+            if (keys['arrowup'] || keys['w']) player.vy = -player.speed;
+            if (keys['arrowdown'] || keys['s']) player.vy = player.speed;
+
+            player.x += player.vx;
+            player.y += player.vy;
+
+            // Границы карты
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            if (player.y < 0) player.y = 0;
+            if (player.y + player.height > canvas.height) player.y = canvas.height - player.height;
+        }
+
+        // AI врага
+        function updateEnemy() {
+            const dx = player.x - enemy.x;
+            const dy = player.y - enemy.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > 0) {
+                enemy.x += (dx / distance) * enemy.speed;
+                enemy.y += (dy / distance) * enemy.speed;
+            }
+
+            // Границы
+            if (enemy.x < 0) enemy.x = 0;
+            if (enemy.x + enemy.width > canvas.width) enemy.x = canvas.width - enemy.width;
+            if (enemy.y < 0) enemy.y = 0;
+            if (enemy.y + enemy.height > canvas.height) enemy.y = canvas.height - enemy.height;
+        }
+
+        // Проверка столкновений
+        function checkCollisions() {
+            // Звёзды
+            stars = stars.filter(star => {
+                if (
+                    player.x < star.x + star.width &&
+                    player.x + player.width > star.x &&
+                    player.y < star.y + star.height &&
+                    player.y + player.height > star.y
+                ) {
+                    score++;
+                    return false;
+                }
+                return true;
+            });
+
+            // Враг
+            if (
+                player.x < enemy.x + enemy.width &&
+                player.x + player.width > enemy.x &&
+                player.y < enemy.y + enemy.height &&
+                player.y + player.height > enemy.y
+            ) {
+                player.health--;
+                player.x = 100;
+                player.y = 100;
+                if (player.health <= 0) {
+                    gameOver = true;
+                }
+            }
+
+            // Новые звёзды когда собрали все
+            if (stars.length === 0) {
+                createStars();
+            }
+        }
+
+        // Рисование
+        function draw() {
+            // Фон (небо и трава)
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+            ctx.fillStyle = '#90EE90';
+            ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
+
+            // Облака
+            drawClouds();
+
+            // Замок в фоне
+            drawCastle();
+
+            // Звёзды
+            stars.forEach(star => {
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(star.emoji, star.x + star.width / 2, star.y + star.height / 2);
+            });
+
+            // Игрок (Микки)
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(player.emoji, player.x + player.width / 2, player.y + player.height / 2);
+
+            // Враг (Гумба)
+            ctx.fillText(enemy.emoji, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+
+            // UI
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Звёзды: ${score}`, 20, 30);
+            ctx.fillText(`Здоровье: ${'❤️'.repeat(player.health)}`, 20, 60);
+
+            if (gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 50px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('ИГРА ОКОНЧЕНА!', canvas.width / 2, canvas.height / 2 - 50);
+                ctx.font = '30px Arial';
+                ctx.fillText(`Собрано звёзд: ${score}`, canvas.width / 2, canvas.height / 2 + 30);
+                ctx.fillText('Обновите страницу для перезапуска', canvas.width / 2, canvas.height / 2 + 80);
+            }
+        }
+
+        function drawClouds() {
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            // Облако 1
+            ctx.beginPath();
+            ctx.arc(100, 80, 30, 0, Math.PI * 2);
+            ctx.arc(130, 70, 40, 0, Math.PI * 2);
+            ctx.arc(160, 80, 30, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Облако 2
+            ctx.beginPath();
+            ctx.arc(650, 120, 25, 0, Math.PI * 2);
+            ctx.arc(680, 110, 35, 0, Math.PI * 2);
+            ctx.arc(710, 120, 25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawCastle() {
+            // Замок Диснея в фоне (простой рисунок)
+            ctx.fillStyle = 'rgba(200, 150, 100, 0.5)';
+            
+            // Основание
+            ctx.fillRect(canvas.width - 250, 200, 200, 150);
+            
+            // Башни
+            ctx.fillRect(canvas.width - 280, 150, 40, 200);
+            ctx.fillRect(canvas.width - 60, 150, 40, 200);
+            
+            // Крыши башен
+            ctx.fillStyle = 'rgba(150, 100, 50, 0.5)';
+            ctx.beginPath();
+            ctx.moveTo(canvas.width - 280, 150);
+            ctx.lineTo(canvas.width - 260, 120);
+            ctx.lineTo(canvas.width - 240, 150);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(canvas.width - 60, 150);
+            ctx.lineTo(canvas.width - 40, 120);
+            ctx.lineTo(canvas.width - 20, 150);
+            ctx.fill();
+        }
+
+        // Основной игровой цикл
+        function gameLoop() {
+            if (!gameOver) {
+                updatePlayer();
+                updateEnemy();
+                checkCollisions();
+            }
+
+            draw();
+
+            // Обновление UI
+            document.getElementById('stars').textContent = score;
+            document.getElementById('health').textContent = '❤️'.repeat(Math.max(0, player.health));
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Стартуем
+        createStars();
+        gameLoop();
+    </script>
+</body>
+</html>
